@@ -45,8 +45,6 @@ class Recorder:
 
 
 class TestAuth:
-    # REST authenticates with X-API-Key. The MCP endpoint is the one that takes
-    # Authorization: Bearer, and confusing the two is a mistake that shipped once.
     def test_sends_x_api_key_and_never_a_bearer_token(self) -> None:
         rec = Recorder({"success": True, "data": {}})
         make_client(rec).scrape("https://example.com")

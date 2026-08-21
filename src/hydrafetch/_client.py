@@ -40,8 +40,6 @@ def _resolve_key(api_key: str | None) -> str:
 
 
 def _headers(api_key: str) -> dict[str, str]:
-    # REST authenticates with X-API-Key. The MCP endpoint uses Authorization: Bearer
-    # instead; they are not interchangeable, and this client only speaks REST.
     return {
         "X-API-Key": api_key,
         "content-type": "application/json",
@@ -69,7 +67,6 @@ def _unwrap(response: httpx.Response) -> Any:
 
     if isinstance(payload, dict) and "data" in payload:
         return payload["data"]
-    # Job endpoints answer with the id at the top level rather than under data.
     return payload
 
 
@@ -91,7 +88,6 @@ class _Base:
         self._timeout = timeout
         self._max_retries = max_retries
 
-    # --- request builders, shared by both clients -------------------------------------
     def _scrape_body(self, url: str, options: Mapping[str, Any]) -> dict[str, Any]:
         return {"url": url, **_drop_none(options)}
 
@@ -157,7 +153,6 @@ class Hydrafetch(_Base):
                 time.sleep(_backoff(attempt))
         raise last or HydrafetchError("Request failed")
 
-    # --- endpoints ---------------------------------------------------------------------
     def scrape(self, url: str, **options: Any) -> dict[str, Any]:
         """One page as clean Markdown and structured data. One credit."""
         return self._request("POST", "/v1/web/scrape", json=self._scrape_body(url, options))
@@ -198,7 +193,6 @@ class Hydrafetch(_Base):
         """A page's links. One credit."""
         return self._request("POST", "/v1/web/links", json=self._scrape_body(url, options))
 
-    # --- jobs --------------------------------------------------------------------------
     def start_crawl(self, url: str, **options: Any) -> str:
         payload = self._request("POST", "/v1/web/crawl", json=self._scrape_body(url, options))
         return self._job_id(payload, "crawlId")
