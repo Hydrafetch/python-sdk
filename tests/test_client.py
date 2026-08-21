@@ -25,8 +25,6 @@ def ok(body: Any, status: int = 200) -> httpx.Response:
 
 
 class Recorder:
-    """Captures the last request so assertions do not depend on call ordering."""
-
     def __init__(self, body: Any, status: int = 200) -> None:
         self.body = body
         self.status = status

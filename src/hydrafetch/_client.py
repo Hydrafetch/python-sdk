@@ -107,8 +107,6 @@ class _Base:
 
 
 class Hydrafetch(_Base):
-    """Synchronous client. See AsyncHydrafetch for the awaitable version."""
-
     def __init__(self, api_key: str | None = None, **kwargs: Any) -> None:
         super().__init__(api_key, **kwargs)
         self._http = httpx.Client(
@@ -154,43 +152,33 @@ class Hydrafetch(_Base):
         raise last or HydrafetchError("Request failed")
 
     def scrape(self, url: str, **options: Any) -> dict[str, Any]:
-        """One page as clean Markdown and structured data. One credit."""
         return self._request("POST", "/v1/web/scrape", json=self._scrape_body(url, options))
 
     def map(self, url: str, **options: Any) -> dict[str, Any]:
-        """A site's URLs from its sitemap and links, without fetching the pages. One credit."""
         return self._request("POST", "/v1/web/map", json=self._scrape_body(url, options))
 
     def search(self, query: str, **options: Any) -> dict[str, Any]:
-        """Ranked web results. One credit, plus one per result when scrape_results is set."""
         return self._request("POST", "/v1/web/search", json={"query": query, **_drop_none(options)})
 
     def extract(self, urls: str | Iterable[str], **options: Any) -> Any:
-        """Typed JSON from one or more URLs. Five credits per URL."""
         return self._request("POST", "/v1/web/extract", json=self._extract_body(urls, options))
 
     def brand(self, domain: str) -> dict[str, Any]:
-        """A company's brand from its domain. Five credits."""
         return self._request("GET", "/v1/web/brand", params={"domain": domain})
 
     def logo(self, domain: str, **options: Any) -> dict[str, Any]:
-        """One embeddable logo. One credit, a fifth of a full brand resolve."""
         return self._request("GET", "/v1/web/brand/logo", params={"domain": domain, **options})
 
     def styleguide(self, domain: str) -> dict[str, Any]:
-        """A site's design system, read from computed styles in a real browser. Ten credits."""
         return self._request("GET", "/v1/web/styleguide", params={"domain": domain})
 
     def screenshot(self, url: str, **options: Any) -> dict[str, Any]:
-        """A rendered PNG of the page, returned as a public URL. Five credits."""
         return self._request("POST", "/v1/web/screenshot", json=self._scrape_body(url, options))
 
     def images(self, url: str, **options: Any) -> dict[str, Any]:
-        """A page's images with metadata, without rendering it. One credit."""
         return self._request("POST", "/v1/web/images", json=self._scrape_body(url, options))
 
     def links(self, url: str, **options: Any) -> dict[str, Any]:
-        """A page's links. One credit."""
         return self._request("POST", "/v1/web/links", json=self._scrape_body(url, options))
 
     def start_crawl(self, url: str, **options: Any) -> str:
@@ -218,7 +206,6 @@ class Hydrafetch(_Base):
         on_progress: Callable[[dict[str, Any]], None] | None = None,
         **options: Any,
     ) -> dict[str, Any]:
-        """Start a crawl and poll until it reaches a terminal state."""
         crawl_id = self.start_crawl(url, **options)
         return self._wait(
             lambda: self.crawl_status(crawl_id), poll_interval, job_timeout, on_progress
@@ -233,7 +220,6 @@ class Hydrafetch(_Base):
         on_progress: Callable[[dict[str, Any]], None] | None = None,
         **options: Any,
     ) -> dict[str, Any]:
-        """Start a batch and poll until it reaches a terminal state."""
         batch_id = self.start_batch(urls, **options)
         return self._wait(
             lambda: self.batch_status(batch_id), poll_interval, job_timeout, on_progress
@@ -262,8 +248,6 @@ class Hydrafetch(_Base):
 
 
 class AsyncHydrafetch(_Base):
-    """Awaitable client with the same surface as Hydrafetch."""
-
     def __init__(self, api_key: str | None = None, **kwargs: Any) -> None:
         super().__init__(api_key, **kwargs)
         self._http = httpx.AsyncClient(

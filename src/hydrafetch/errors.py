@@ -4,8 +4,6 @@ from typing import Any
 
 
 class HydrafetchError(Exception):
-    """Any failure from the Hydrafetch API, carrying the server's own code and request id."""
-
     def __init__(
         self,
         message: str,
@@ -32,22 +30,18 @@ class HydrafetchError(Exception):
 
     @property
     def is_auth(self) -> bool:
-        """401 and 403. Retrying without changing the key is pointless."""
         return self.status in (401, 403)
 
     @property
     def is_out_of_credits(self) -> bool:
-        """402. The workspace has no credits left."""
         return self.status == 402
 
     @property
     def is_invalid_request(self) -> bool:
-        """400 and 422. The request is wrong; a repeat fails the same way and costs another call."""
         return self.status in (400, 422)
 
     @property
     def is_retryable(self) -> bool:
-        """429 and 5xx. Worth another attempt after a wait."""
         return self.status == 429 or self.status >= 500
 
 
