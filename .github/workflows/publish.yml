@@ -11,7 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
-      contents: read
+      # contents: write is what lets the release be created; the publish itself needs only read.
+      contents: write
       id-token: write
     steps:
       - uses: actions/checkout@v4
@@ -25,3 +26,10 @@ jobs:
           [ "$TAG" = "$PKG" ] || { echo "tag $TAG != pyproject $PKG"; exit 1; }
       - run: uv build
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+      # After the publish, never before: a release pointing at a version that is not on PyPI is
+      # worse than no release at all.
+      - name: Create the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
