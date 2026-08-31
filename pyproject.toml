@@ -46,3 +46,9 @@ target-version = "py39"
 # PYI019 wants typing.Self on the context managers. Self landed in 3.11 and this
 # package supports 3.9, so the bound TypeVars stay until the floor moves.
 ignore = ["PYI019"]
+
+[tool.ruff.lint.pyupgrade]
+# `from __future__ import annotations` normally makes `X | None` safe on 3.9, which is why ruff
+# offers to rewrite Optional. Pydantic evaluates annotations at runtime, so on 3.9 the rewrite
+# turns a working model into a TypeError at import. Only the 3.9 CI leg catches it.
+keep-runtime-typing = true

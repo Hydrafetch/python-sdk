@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 import pytest
@@ -238,7 +238,7 @@ def test_extract_still_takes_plain_json_schema():
 
 
 class Node(BaseModel):
-    child: Node | None = None
+    child: Optional[Node] = None
 
 
 def test_extract_rejects_a_recursive_model_rather_than_sending_a_ref():
