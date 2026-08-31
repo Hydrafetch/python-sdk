@@ -82,6 +82,22 @@ for item in out["results"]:
 
 Pass `prompt=` instead of, or alongside, `schema=` to describe the fields in plain language.
 
+### From a pydantic model
+
+`schema=` also takes a pydantic model, so the shape you already parse into is the shape you ask for. A `Field` description is carried through and tells the model what the field means, which is worth more on an ambiguous page than the field name alone.
+
+```python
+from pydantic import BaseModel, Field
+
+class Product(BaseModel):
+    name: str = Field(description="The product being sold on this page, not a recommended one")
+    price_usd: float = Field(description="Current price in USD, after any discount")
+
+out = hf.extract("https://example.com/product/1", schema=Product)
+```
+
+Nested models work and are flattened before sending. pydantic is not a dependency and is imported only if you pass a model. A model that refers to itself cannot be flattened and is refused rather than sent.
+
 ## Discovery and bulk work
 
 `map` lists a site's URLs for one credit without fetching any page.

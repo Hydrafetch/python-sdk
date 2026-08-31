@@ -8,6 +8,7 @@ from typing import Any, Callable, Literal, TypeVar
 
 import httpx
 
+from ._schema import to_json_schema
 from .errors import HydrafetchError, HydrafetchTimeout
 
 DEFAULT_BASE_URL = "https://api.hydrafetch.com"
@@ -95,7 +96,10 @@ class _Base:
         self, urls: str | Iterable[str], options: Mapping[str, Any]
     ) -> dict[str, Any]:
         url_list = [urls] if isinstance(urls, str) else list(urls)
-        return {"urls": url_list, **_drop_none(options)}
+        body = _drop_none(options)
+        if "schema" in body:
+            body["schema"] = to_json_schema(body["schema"])
+        return {"urls": url_list, **body}
 
     def _job_id(self, payload: Any, *keys: str) -> str:
         if isinstance(payload, dict):

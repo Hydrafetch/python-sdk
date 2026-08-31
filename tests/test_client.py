@@ -5,6 +5,7 @@ from typing import Any
 
 import httpx
 import pytest
+from pydantic import BaseModel
 
 from hydrafetch import AsyncHydrafetch, Hydrafetch, HydrafetchError, HydrafetchTimeout
 
@@ -18,6 +19,16 @@ def make_client(handler, **kwargs: Any) -> Hydrafetch:
         transport=httpx.MockTransport(handler),
     )
     return client
+
+
+def _recording_client() -> tuple[Hydrafetch, list[dict[str, Any]]]:
+    seen: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return httpx.Response(200, json={"success": True, "data": {"results": []}})
+
+    return make_client(handler), seen
 
 
 def ok(body: Any, status: int = 200) -> httpx.Response:
@@ -200,3 +211,38 @@ class TestAsyncClient:
             out = await client.scrape("https://example.com")
         assert out["markdown"] == "# async"
         assert rec.last.headers["x-api-key"] == "hf_test"
+
+
+def test_extract_accepts_a_pydantic_model_and_inlines_nested_ones():
+    class Address(BaseModel):
+        city: str
+
+    class Person(BaseModel):
+        name: str
+        home: Address
+
+    client, seen = _recording_client()
+    client.extract("https://example.com", schema=Person)
+
+    schema = seen[0]["schema"]
+    assert schema["properties"]["name"]["type"] == "string"
+    assert schema["properties"]["home"]["properties"]["city"]["type"] == "string"
+    assert "$defs" not in schema and "$ref" not in str(schema)
+
+
+def test_extract_still_takes_plain_json_schema():
+    client, seen = _recording_client()
+    plain = {"type": "object", "properties": {"name": {"type": "string"}}}
+    client.extract("https://example.com", schema=plain)
+    assert seen[0]["schema"] == plain
+
+
+class Node(BaseModel):
+    child: Node | None = None
+
+
+def test_extract_rejects_a_recursive_model_rather_than_sending_a_ref():
+    client, _ = _recording_client()
+    with pytest.raises(HydrafetchError) as err:
+        client.extract("https://example.com", schema=Node)
+    assert err.value.code == "SCHEMA_CONVERSION_FAILED"
