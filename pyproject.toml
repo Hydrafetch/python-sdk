@@ -1,6 +1,6 @@
 [project]
 name = "hydrafetch"
-version = "0.2.0"
+version = "0.3.0"
 description = "Official Python client for the Hydrafetch web data API. Turn any URL into clean Markdown and structured data."
 readme = "README.md"
 license = "MIT"

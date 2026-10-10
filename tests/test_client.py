@@ -102,6 +102,16 @@ class TestRequestShaping:
         assert rec.last.url.params["theme"] == "dark"
         assert not rec.last.content
 
+    def test_styleguide_reads_a_domain_or_one_page(self) -> None:
+        rec = Recorder({"success": True, "data": {}})
+        hf = make_client(rec)
+        hf.styleguide("stripe.com")
+        assert rec.last.url.params["domain"] == "stripe.com"
+        hf.styleguide("https://stripe.com/pricing", maxAge=0)
+        assert rec.last.url.params["url"] == "https://stripe.com/pricing"
+        assert rec.last.url.params["maxAge"] == "0"
+        assert "domain" not in rec.last.url.params
+
 
 class TestErrors:
     def test_surfaces_code_status_and_request_id(self) -> None:

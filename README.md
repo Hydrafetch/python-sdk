@@ -148,6 +148,7 @@ for r in res["results"]:
 hf.brand("stripe.com")                              # logos, colours, fonts, socials
 hf.logo("stripe.com", theme="dark", type="icon")    # one asset
 hf.styleguide("stripe.com")                         # computed design system
+hf.styleguide("https://stripe.com/pricing", maxAge=0)  # one page, read fresh
 ```
 
 For logos in a browser use [`@hydrafetch/client-sdk`](https://github.com/Hydrafetch/client-sdk) with a publishable key. Those bill against logo pulls rather than credits.
@@ -231,7 +232,7 @@ hf = Hydrafetch(
 | `extract(urls, **options)` | dict with `"results"` | 5 per URL |
 | `brand(domain)` | brand dict | 5 |
 | `logo(domain, **options)` | logo dict | 1 |
-| `styleguide(domain)` | design system dict | 10 |
+| `styleguide(domain_or_url, **options)` | design system dict | 10 |
 | `screenshot(url, **options)` | screenshot dict | 5 |
 | `images(url)`, `links(url)` | page assets | 1 |
 | `crawl(url, **options)` | job dict, polled to completion | 1 per page |

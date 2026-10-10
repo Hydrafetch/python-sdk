@@ -92,6 +92,10 @@ class _Base:
     def _scrape_body(self, url: str, options: Mapping[str, Any]) -> dict[str, Any]:
         return {"url": url, **_drop_none(options)}
 
+    def _styleguide_params(self, target: str, options: Mapping[str, Any]) -> dict[str, Any]:
+        key = "url" if target.lower().startswith(("http://", "https://")) else "domain"
+        return {key: target, **_drop_none(options)}
+
     def _extract_body(
         self, urls: str | Iterable[str], options: Mapping[str, Any]
     ) -> dict[str, Any]:
@@ -173,8 +177,10 @@ class Hydrafetch(_Base):
     def logo(self, domain: str, **options: Any) -> dict[str, Any]:
         return self._request("GET", "/v1/web/brand/logo", params={"domain": domain, **options})
 
-    def styleguide(self, domain: str) -> dict[str, Any]:
-        return self._request("GET", "/v1/web/styleguide", params={"domain": domain})
+    def styleguide(self, domain_or_url: str, **options: Any) -> dict[str, Any]:
+        return self._request(
+            "GET", "/v1/web/styleguide", params=self._styleguide_params(domain_or_url, options)
+        )
 
     def screenshot(self, url: str, **options: Any) -> dict[str, Any]:
         return self._request("POST", "/v1/web/screenshot", json=self._scrape_body(url, options))
@@ -322,8 +328,10 @@ class AsyncHydrafetch(_Base):
             "GET", "/v1/web/brand/logo", params={"domain": domain, **options}
         )
 
-    async def styleguide(self, domain: str) -> dict[str, Any]:
-        return await self._request("GET", "/v1/web/styleguide", params={"domain": domain})
+    async def styleguide(self, domain_or_url: str, **options: Any) -> dict[str, Any]:
+        return await self._request(
+            "GET", "/v1/web/styleguide", params=self._styleguide_params(domain_or_url, options)
+        )
 
     async def screenshot(self, url: str, **options: Any) -> dict[str, Any]:
         return await self._request(
