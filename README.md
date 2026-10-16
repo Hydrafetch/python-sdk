@@ -25,7 +25,7 @@ page = hf.scrape("https://example.com/article")
 print(page["markdown"])
 ```
 
-Create a key at [app.hydrafetch.com](https://app.hydrafetch.com). The constructor reads `HYDRAFETCH_API_KEY` when no key is passed.
+Copy your key from [app.hydrafetch.com](https://app.hydrafetch.com). The constructor reads `HYDRAFETCH_API_KEY` when no key is passed.
 
 Both clients are context managers, which closes the connection pool deterministically:
 
