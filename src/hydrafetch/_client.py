@@ -88,6 +88,31 @@ class _Base:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._max_retries = max_retries
+        self.last_request_id: str | None = None
+
+    def _rate_body(
+        self,
+        rating: str,
+        request_id: str | None,
+        url: str | None,
+        reasons: Iterable[str] | None,
+        note: str | None,
+    ) -> dict[str, Any]:
+        if request_id is None and url is None:
+            raise HydrafetchError(
+                "Pass request_id or url to say which result you are rating.",
+                code="VALIDATION_ERROR",
+                status=400,
+            )
+        return _drop_none(
+            {
+                "requestId": request_id,
+                "url": url,
+                "rating": rating,
+                "reasons": list(reasons) if reasons is not None else None,
+                "note": note,
+            }
+        )
 
     def _scrape_body(self, url: str, options: Mapping[str, Any]) -> dict[str, Any]:
         return {"url": url, **_drop_none(options)}
@@ -150,6 +175,7 @@ class Hydrafetch(_Base):
                     "or use the crawl and batch job endpoints for long work."
                 ) from exc
 
+            self.last_request_id = response.headers.get("x-request-id") or self.last_request_id
             try:
                 return _unwrap(response)
             except HydrafetchError as err:
@@ -161,6 +187,18 @@ class Hydrafetch(_Base):
 
     def scrape(self, url: str, **options: Any) -> dict[str, Any]:
         return self._request("POST", "/v1/web/scrape", json=self._scrape_body(url, options))
+
+    def rate_result(
+        self,
+        rating: str,
+        *,
+        request_id: str | None = None,
+        url: str | None = None,
+        reasons: Iterable[str] | None = None,
+        note: str | None = None,
+    ) -> dict[str, Any]:
+        body = self._rate_body(rating, request_id, url, reasons, note)
+        return self._request("POST", "/v1/web/feedback", json=body)
 
     def map(self, url: str, **options: Any) -> dict[str, Any]:
         return self._request("POST", "/v1/web/map", json=self._scrape_body(url, options))
@@ -295,6 +333,7 @@ class AsyncHydrafetch(_Base):
                     "or use the crawl and batch job endpoints for long work."
                 ) from exc
 
+            self.last_request_id = response.headers.get("x-request-id") or self.last_request_id
             try:
                 return _unwrap(response)
             except HydrafetchError as err:
@@ -306,6 +345,18 @@ class AsyncHydrafetch(_Base):
 
     async def scrape(self, url: str, **options: Any) -> dict[str, Any]:
         return await self._request("POST", "/v1/web/scrape", json=self._scrape_body(url, options))
+
+    async def rate_result(
+        self,
+        rating: str,
+        *,
+        request_id: str | None = None,
+        url: str | None = None,
+        reasons: Iterable[str] | None = None,
+        note: str | None = None,
+    ) -> dict[str, Any]:
+        body = self._rate_body(rating, request_id, url, reasons, note)
+        return await self._request("POST", "/v1/web/feedback", json=body)
 
     async def map(self, url: str, **options: Any) -> dict[str, Any]:
         return await self._request("POST", "/v1/web/map", json=self._scrape_body(url, options))

@@ -256,3 +256,40 @@ def test_extract_rejects_a_recursive_model_rather_than_sending_a_ref():
     with pytest.raises(HydrafetchError) as err:
         client.extract("https://example.com", schema=Node)
     assert err.value.code == "SCHEMA_CONVERSION_FAILED"
+
+
+def test_rate_result_posts_the_rating_for_the_last_request() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if request.url.path == "/v1/web/feedback":
+            return ok({"success": True, "data": {"id": "f1", "requestId": "r1", "rating": "bad"}})
+        return httpx.Response(
+            200, json={"success": True, "data": {}}, headers={"x-request-id": "r1"}
+        )
+
+    client = make_client(handler)
+    client.scrape("https://a.com")
+    assert client.last_request_id == "r1"
+
+    out = client.rate_result(
+        "bad", request_id=client.last_request_id, reasons=["missing_content"], note="no prices"
+    )
+
+    assert out == {"id": "f1", "requestId": "r1", "rating": "bad"}
+    assert json.loads(seen[-1].content) == {
+        "requestId": "r1",
+        "rating": "bad",
+        "reasons": ["missing_content"],
+        "note": "no prices",
+    }
+
+
+def test_rate_result_can_rate_by_url_and_needs_a_target() -> None:
+    rec = Recorder({"success": True, "data": {"id": "f2", "requestId": "r2", "rating": "good"}})
+    client = make_client(rec)
+    client.rate_result("good", url="https://a.com")
+    assert json.loads(rec.last.content) == {"url": "https://a.com", "rating": "good"}
+    with pytest.raises(HydrafetchError):
+        client.rate_result("good")
