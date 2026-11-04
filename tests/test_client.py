@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 import httpx
@@ -293,3 +294,34 @@ def test_rate_result_can_rate_by_url_and_needs_a_target() -> None:
     assert json.loads(rec.last.content) == {"url": "https://a.com", "rating": "good"}
     with pytest.raises(HydrafetchError):
         client.rate_result("good")
+
+
+def test_search_jobs_posts_the_query_and_returns_the_list() -> None:
+    job = {"title": "Data Engineer", "domain": "acme.com", "board": "greenhouse"}
+    rec = Recorder({"success": True, "data": [job]})
+    client = make_client(rec)
+    jobs = client.search_jobs("data engineer", location="Berlin", limit=20, remoteOnly=None)
+    assert jobs == [job]
+    assert rec.last.url.path == "/v1/web/index/jobs/search"
+    assert json.loads(rec.last.content) == {
+        "query": "data engineer",
+        "location": "Berlin",
+        "limit": 20,
+    }
+
+
+def test_hiring_changes_takes_one_domain_or_many_and_a_datetime() -> None:
+    rec = Recorder({"success": True, "data": []})
+    client = make_client(rec)
+    client.hiring_changes("stripe.com", datetime(2026, 10, 1, tzinfo=timezone.utc))
+    assert rec.last.url.path == "/v1/web/index/jobs/changes"
+    assert json.loads(rec.last.content) == {
+        "domains": ["stripe.com"],
+        "since": "2026-10-01T00:00:00+00:00",
+    }
+    client.hiring_changes(["a.com", "b.com"], "2026-10-01", includeDescriptions=True)
+    assert json.loads(rec.last.content) == {
+        "domains": ["a.com", "b.com"],
+        "since": "2026-10-01",
+        "includeDescriptions": True,
+    }

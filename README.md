@@ -142,6 +142,29 @@ for r in res["results"]:
     print(((r.get("data") or {}).get("markdown") or "")[:500])
 ```
 
+## Jobs
+
+Search open jobs collected from company career sites and hiring platforms, by the words in the job title:
+
+```python
+jobs = hf.search_jobs("data engineer", location="Berlin", postedWithinDays=14, limit=20)
+
+for job in jobs:
+    print(job["title"], job["company"], job["location"], job["url"])
+```
+
+See what changed in a company's hiring since a date: what is open now, what opened and what closed, by department, seniority and location, with the jobs themselves:
+
+```python
+[acme] = hf.hiring_changes("acme.com", "2026-10-01")
+
+print(acme["totals"])  # {"open": 42, "opened": 6, "closed": 3}
+for job in acme["opened"]:
+    print(job["title"], job["seniority"], job["firstSeenAt"])
+```
+
+A search costs 1 credit per 10 jobs returned, and an empty one is free. Hiring changes cost 1 credit per company we have jobs for; companies we do not track yet come back empty and are free.
+
 ## Brand data
 
 ```python
@@ -247,6 +270,8 @@ hf = Hydrafetch(
 | `markdown(url, **options)` | `str` | 1 |
 | `map(url, **options)` | links dict | 1 |
 | `search(query, **options)` | results dict | 1 + 1 per scraped result |
+| `search_jobs(query, **options)` | list of jobs | 1 per 10 jobs |
+| `hiring_changes(domains, since, **options)` | list of companies | 1 per company with jobs |
 | `extract(urls, **options)` | dict with `"results"` | 5 per URL |
 | `brand(domain)` | brand dict | 5 |
 | `logo(domain, **options)` | logo dict | 1 |

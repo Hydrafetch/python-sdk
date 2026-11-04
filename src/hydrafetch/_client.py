@@ -4,6 +4,7 @@ import os
 import random
 import time
 from collections.abc import Iterable, Mapping
+from datetime import datetime
 from typing import Any, Callable, Literal, TypeVar
 
 import httpx
@@ -130,6 +131,13 @@ class _Base:
             body["schema"] = to_json_schema(body["schema"])
         return {"urls": url_list, **body}
 
+    def _changes_body(
+        self, domains: str | Iterable[str], since: str | datetime, options: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        domain_list = [domains] if isinstance(domains, str) else list(domains)
+        when = since.isoformat() if isinstance(since, datetime) else since
+        return {"domains": domain_list, "since": when, **_drop_none(options)}
+
     def _job_id(self, payload: Any, *keys: str) -> str:
         if isinstance(payload, dict):
             for key in (*keys, "id"):
@@ -205,6 +213,18 @@ class Hydrafetch(_Base):
 
     def search(self, query: str, **options: Any) -> dict[str, Any]:
         return self._request("POST", "/v1/web/search", json={"query": query, **_drop_none(options)})
+
+    def search_jobs(self, query: str, **options: Any) -> list[dict[str, Any]]:
+        return self._request(
+            "POST", "/v1/web/index/jobs/search", json={"query": query, **_drop_none(options)}
+        )
+
+    def hiring_changes(
+        self, domains: str | Iterable[str], since: str | datetime, **options: Any
+    ) -> list[dict[str, Any]]:
+        return self._request(
+            "POST", "/v1/web/index/jobs/changes", json=self._changes_body(domains, since, options)
+        )
 
     def extract(self, urls: str | Iterable[str], **options: Any) -> Any:
         return self._request("POST", "/v1/web/extract", json=self._extract_body(urls, options))
@@ -364,6 +384,18 @@ class AsyncHydrafetch(_Base):
     async def search(self, query: str, **options: Any) -> dict[str, Any]:
         return await self._request(
             "POST", "/v1/web/search", json={"query": query, **_drop_none(options)}
+        )
+
+    async def search_jobs(self, query: str, **options: Any) -> list[dict[str, Any]]:
+        return await self._request(
+            "POST", "/v1/web/index/jobs/search", json={"query": query, **_drop_none(options)}
+        )
+
+    async def hiring_changes(
+        self, domains: str | Iterable[str], since: str | datetime, **options: Any
+    ) -> list[dict[str, Any]]:
+        return await self._request(
+            "POST", "/v1/web/index/jobs/changes", json=self._changes_body(domains, since, options)
         )
 
     async def extract(self, urls: str | Iterable[str], **options: Any) -> Any:
