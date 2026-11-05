@@ -142,6 +142,19 @@ for r in res["results"]:
     print(((r.get("data") or {}).get("markdown") or "")[:500])
 ```
 
+## News
+
+Find recent news articles about anything, newest first, each with its outlet and publish time:
+
+```python
+found = hf.news("acme raises funding", timeRange="week", limit=10)
+
+for article in found["results"]:
+    print(article["publishedAt"], article["source"], article["title"], article["url"])
+```
+
+A news search costs 1 credit, and one that finds nothing is free. Pass `scrapeResults=True` to also read each article as clean data, at 1 extra credit per article.
+
 ## Jobs
 
 Search open jobs collected from company career sites and hiring platforms, by the words in the job title:
@@ -270,6 +283,7 @@ hf = Hydrafetch(
 | `markdown(url, **options)` | `str` | 1 |
 | `map(url, **options)` | links dict | 1 |
 | `search(query, **options)` | results dict | 1 + 1 per scraped result |
+| `news(query, **options)` | articles, newest first | 1 + 1 per article read; free when empty |
 | `search_jobs(query, **options)` | list of jobs | 1 per 10 jobs |
 | `hiring_changes(domains, since, **options)` | list of companies | 1 per company with jobs |
 | `extract(urls, **options)` | dict with `"results"` | 5 per URL |

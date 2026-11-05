@@ -214,6 +214,9 @@ class Hydrafetch(_Base):
     def search(self, query: str, **options: Any) -> dict[str, Any]:
         return self._request("POST", "/v1/web/search", json={"query": query, **_drop_none(options)})
 
+    def news(self, query: str, **options: Any) -> dict[str, Any]:
+        return self._request("POST", "/v1/web/news", json={"query": query, **_drop_none(options)})
+
     def search_jobs(self, query: str, **options: Any) -> list[dict[str, Any]]:
         return self._request(
             "POST", "/v1/web/index/jobs/search", json={"query": query, **_drop_none(options)}
@@ -384,6 +387,11 @@ class AsyncHydrafetch(_Base):
     async def search(self, query: str, **options: Any) -> dict[str, Any]:
         return await self._request(
             "POST", "/v1/web/search", json={"query": query, **_drop_none(options)}
+        )
+
+    async def news(self, query: str, **options: Any) -> dict[str, Any]:
+        return await self._request(
+            "POST", "/v1/web/news", json={"query": query, **_drop_none(options)}
         )
 
     async def search_jobs(self, query: str, **options: Any) -> list[dict[str, Any]]:

@@ -325,3 +325,13 @@ def test_hiring_changes_takes_one_domain_or_many_and_a_datetime() -> None:
         "since": "2026-10-01",
         "includeDescriptions": True,
     }
+
+
+def test_news_posts_the_query_and_window() -> None:
+    found = {"query": "acme raises", "status": "ok", "results": [{"title": "Acme raises $10M"}]}
+    rec = Recorder({"success": True, "data": found})
+    client = make_client(rec)
+    out = client.news("acme raises", timeRange="day", limit=5, country=None)
+    assert out == found
+    assert rec.last.url.path == "/v1/web/news"
+    assert json.loads(rec.last.content) == {"query": "acme raises", "timeRange": "day", "limit": 5}
