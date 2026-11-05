@@ -104,7 +104,7 @@ Nested models work and are flattened before sending. pydantic is not a dependenc
 
 ```python
 links = hf.map("https://example.com", limit=1000)["links"]
-docs = [url for url in links if "/docs/" in url]
+docs = [link["url"] for link in links if "/docs/" in link["url"]]
 ```
 
 `batch` and `crawl` submit a job and poll until it finishes.
