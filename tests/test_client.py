@@ -335,3 +335,59 @@ def test_news_posts_the_query_and_window() -> None:
     assert out == found
     assert rec.last.url.path == "/v1/web/news"
     assert json.loads(rec.last.content) == {"query": "acme raises", "timeRange": "day", "limit": 5}
+
+
+ACCEPTED_BODY = {"jobId": "j-1", "status": "running", "poll": "/v1/web/jobs/j-1"}
+
+
+def test_a_202_is_followed_until_the_job_completes(monkeypatch) -> None:
+    monkeypatch.setattr("hydrafetch._client.CALL_JOB_POLL", 0)
+    polls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/web/scrape":
+            return ok(ACCEPTED_BODY, 202)
+        polls.append(request.url.path)
+        if len(polls) < 2:
+            return ok({"jobId": "j-1", "status": "running"})
+        return ok({"jobId": "j-1", "status": "completed", "result": {"data": {"markdown": "# Hi"}}})
+
+    page = make_client(handler).scrape("https://example.com")
+
+    assert page == {"markdown": "# Hi"}
+    assert polls == ["/v1/web/jobs/j-1", "/v1/web/jobs/j-1"]
+
+
+def test_a_failed_job_raises_the_error_the_call_would_have(monkeypatch) -> None:
+    monkeypatch.setattr("hydrafetch._client.CALL_JOB_POLL", 0)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/web/search":
+            return ok(ACCEPTED_BODY, 202)
+        return ok(
+            {
+                "jobId": "j-1",
+                "status": "failed",
+                "error": {"code": "SERVICE_UNAVAILABLE", "message": "walled", "status": 503},
+            }
+        )
+
+    with pytest.raises(HydrafetchError) as caught:
+        make_client(handler).search("q")
+    assert caught.value.code == "SERVICE_UNAVAILABLE"
+    assert caught.value.status == 503
+
+
+async def test_the_async_client_follows_a_202_too(monkeypatch) -> None:
+    monkeypatch.setattr("hydrafetch._client.CALL_JOB_POLL", 0)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/web/map":
+            return ok(ACCEPTED_BODY, 202)
+        return ok({"jobId": "j-1", "status": "completed", "result": {"data": {"count": 3}}})
+
+    client = AsyncHydrafetch(api_key="hf_test", max_retries=0)
+    client._http = httpx.AsyncClient(
+        base_url="https://api.hydrafetch.com", transport=httpx.MockTransport(handler)
+    )
+    assert await client.map("https://example.com") == {"count": 3}

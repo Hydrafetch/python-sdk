@@ -16,6 +16,10 @@ DEFAULT_BASE_URL = "https://api.hydrafetch.com"
 DEFAULT_TIMEOUT = 120.0
 DEFAULT_MAX_RETRIES = 2
 TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
+ACCEPTED = 202
+CALL_JOB_TIMEOUT = 330.0
+CALL_JOB_POLL = 2.0
+_RUNNING = object()
 
 Format = Literal["markdown", "html", "rawHtml", "links", "structured", "summary", "json", "brand"]
 
@@ -70,6 +74,35 @@ def _unwrap(response: httpx.Response) -> Any:
     if isinstance(payload, dict) and "data" in payload:
         return payload["data"]
     return payload
+
+
+def _accepted_poll(response: httpx.Response, result: Any) -> str | None:
+    if response.status_code == ACCEPTED and isinstance(result, dict) and result.get("poll"):
+        return str(result["poll"])
+    return None
+
+
+def _call_job_result(job: Any) -> Any:
+    status = job.get("status") if isinstance(job, dict) else None
+    if status == "completed":
+        result = job.get("result")
+        return result["data"] if isinstance(result, dict) and "data" in result else result
+    if status == "failed":
+        err = job.get("error") or {}
+        raise HydrafetchError(
+            err.get("message") or "The job failed.",
+            code=err.get("code") or "JOB_FAILED",
+            status=err.get("status") or 500,
+            request_id=job.get("jobId"),
+            details=err.get("details"),
+        )
+    return _RUNNING
+
+
+def _call_job_timeout(poll: str) -> HydrafetchTimeout:
+    return HydrafetchTimeout(
+        f"The job did not finish within {CALL_JOB_TIMEOUT:.0f}s; poll {poll} for its result."
+    )
 
 
 def _backoff(attempt: int) -> float:
@@ -185,13 +218,26 @@ class Hydrafetch(_Base):
 
             self.last_request_id = response.headers.get("x-request-id") or self.last_request_id
             try:
-                return _unwrap(response)
+                result = _unwrap(response)
             except HydrafetchError as err:
                 if not err.is_retryable or attempt == self._max_retries:
                     raise
                 last = err
                 time.sleep(_backoff(attempt))
+                continue
+            poll = _accepted_poll(response, result)
+            return self._follow_call_job(poll) if poll else result
         raise last or HydrafetchError("Request failed")
+
+    def _follow_call_job(self, poll: str) -> Any:
+        deadline = time.monotonic() + CALL_JOB_TIMEOUT
+        while True:
+            time.sleep(CALL_JOB_POLL)
+            result = _call_job_result(self._request("GET", poll))
+            if result is not _RUNNING:
+                return result
+            if time.monotonic() + CALL_JOB_POLL > deadline:
+                raise _call_job_timeout(poll)
 
     def scrape(self, url: str, **options: Any) -> dict[str, Any]:
         return self._request("POST", "/v1/web/scrape", json=self._scrape_body(url, options))
@@ -358,13 +404,28 @@ class AsyncHydrafetch(_Base):
 
             self.last_request_id = response.headers.get("x-request-id") or self.last_request_id
             try:
-                return _unwrap(response)
+                result = _unwrap(response)
             except HydrafetchError as err:
                 if not err.is_retryable or attempt == self._max_retries:
                     raise
                 last = err
                 await asyncio.sleep(_backoff(attempt))
+                continue
+            poll = _accepted_poll(response, result)
+            return await self._follow_call_job(poll) if poll else result
         raise last or HydrafetchError("Request failed")
+
+    async def _follow_call_job(self, poll: str) -> Any:
+        import asyncio
+
+        deadline = time.monotonic() + CALL_JOB_TIMEOUT
+        while True:
+            await asyncio.sleep(CALL_JOB_POLL)
+            result = _call_job_result(await self._request("GET", poll))
+            if result is not _RUNNING:
+                return result
+            if time.monotonic() + CALL_JOB_POLL > deadline:
+                raise _call_job_timeout(poll)
 
     async def scrape(self, url: str, **options: Any) -> dict[str, Any]:
         return await self._request("POST", "/v1/web/scrape", json=self._scrape_body(url, options))
