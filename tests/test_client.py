@@ -167,6 +167,49 @@ class TestErrors:
         assert out["markdown"] == "ok"
         assert calls["n"] == 3
 
+    def test_waits_for_the_retry_after_header(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        slept: list[float] = []
+        monkeypatch.setattr("hydrafetch._client.time.sleep", slept.append)
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return httpx.Response(
+                    429,
+                    headers={"Retry-After": "7"},
+                    json={"success": False, "error": {"message": "slow"}},
+                )
+            return ok({"success": True, "data": {"markdown": "ok"}})
+
+        assert make_client(handler, max_retries=2).scrape("https://example.com")["markdown"] == "ok"
+        assert slept == [7.0]
+
+    def test_returns_at_once_when_asked_to_wait_too_long(self) -> None:
+        rec = Recorder(
+            {
+                "success": False,
+                "error": {"message": "later", "details": {"retryAfterSeconds": 900}},
+            },
+            503,
+        )
+        with pytest.raises(HydrafetchError) as caught:
+            make_client(rec, max_retries=3).scrape("https://example.com")
+        assert caught.value.retry_after == 900
+        assert len(rec.requests) == 1
+
+    def test_retries_a_dropped_connection(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("hydrafetch._client.time.sleep", lambda _s: None)
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise httpx.ConnectError("reset", request=request)
+            return ok({"success": True, "data": {"markdown": "ok"}})
+
+        assert make_client(handler, max_retries=2).scrape("https://example.com")["markdown"] == "ok"
+
 
 class TestJobs:
     def test_reads_batch_id_from_the_top_level_not_from_data(self) -> None:

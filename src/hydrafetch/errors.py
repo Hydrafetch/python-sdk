@@ -12,6 +12,7 @@ class HydrafetchError(Exception):
         status: int = 500,
         request_id: str | None = None,
         details: Any = None,
+        retry_after: int | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
@@ -19,6 +20,7 @@ class HydrafetchError(Exception):
         self.status = status
         self.request_id = request_id
         self.details = details
+        self.retry_after = retry_after
 
     def __str__(self) -> str:
         parts = [self.message]

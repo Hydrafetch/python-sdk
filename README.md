@@ -247,7 +247,7 @@ except HydrafetchError as err:
     elif err.is_invalid_request:
         report(err.message)
     elif err.is_retryable:
-        enqueue(url)
+        enqueue(url, err.retry_after)
     else:
         print(err.code, err.status, err.request_id)
         raise
@@ -259,8 +259,10 @@ except HydrafetchError as err:
 | 401, 403 | invalid or missing key | no |
 | 402 | out of credits | no |
 | 404 | page does not exist | no |
-| 429 | rate limited | yes, twice with backoff |
-| 5xx | upstream failure | yes, twice with backoff |
+| 429 | rate limited | yes, twice |
+| 5xx | upstream failure | yes, twice |
+
+Retries wait as long as the response asks through `Retry-After` or `retryAfterSeconds`, and otherwise back off with jitter. When the response asks for more than 30 seconds the client does not wait; it raises at once and `err.retry_after` gives the seconds to wait before asking again. A dropped connection is retried too, including while the client follows a job.
 
 A 503 from `scrape` means the origin is unreachable, usually a dead domain or a broken certificate.
 

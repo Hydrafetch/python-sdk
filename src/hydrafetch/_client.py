@@ -15,6 +15,8 @@ from .errors import HydrafetchError, HydrafetchTimeout
 DEFAULT_BASE_URL = "https://api.hydrafetch.com"
 DEFAULT_TIMEOUT = 120.0
 DEFAULT_MAX_RETRIES = 2
+MAX_RETRY_WAIT = 30
+BACKOFF_CAP = 8.0
 TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
 ACCEPTED = 202
 CALL_JOB_TIMEOUT = 330.0
@@ -69,6 +71,7 @@ def _unwrap(response: httpx.Response) -> Any:
             status=response.status_code,
             request_id=(meta or {}).get("requestId"),
             details=(err or {}).get("details"),
+            retry_after=_retry_after(response, (err or {}).get("details")),
         )
 
     if isinstance(payload, dict) and "data" in payload:
@@ -105,8 +108,26 @@ def _call_job_timeout(poll: str) -> HydrafetchTimeout:
     )
 
 
+def _retry_after(response: httpx.Response, details: Any) -> int | None:
+    header = response.headers.get("retry-after", "").strip()
+    if header.isdigit():
+        return int(header)
+    if isinstance(details, dict):
+        for key in ("retryAfterSeconds", "retryAfter"):
+            value = details.get(key)
+            if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                return value
+    return None
+
+
 def _backoff(attempt: int) -> float:
-    return (2**attempt) * 0.5 + random.random() * 0.25
+    return random.uniform(0, min(BACKOFF_CAP, 0.5 * 2**attempt))
+
+
+def _retry_wait(err: HydrafetchError, attempt: int) -> float | None:
+    if err.retry_after is None:
+        return _backoff(attempt)
+    return None if err.retry_after > MAX_RETRY_WAIT else float(err.retry_after)
 
 
 class _Base:
@@ -215,15 +236,21 @@ class Hydrafetch(_Base):
                     f"Request to {path} exceeded {self._timeout}s. Raise timeout=, "
                     "or use the crawl and batch job endpoints for long work."
                 ) from exc
+            except httpx.TransportError:
+                if attempt == self._max_retries:
+                    raise
+                time.sleep(_backoff(attempt))
+                continue
 
             self.last_request_id = response.headers.get("x-request-id") or self.last_request_id
             try:
                 result = _unwrap(response)
             except HydrafetchError as err:
-                if not err.is_retryable or attempt == self._max_retries:
+                wait = _retry_wait(err, attempt)
+                if not err.is_retryable or attempt == self._max_retries or wait is None:
                     raise
                 last = err
-                time.sleep(_backoff(attempt))
+                time.sleep(wait)
                 continue
             poll = _accepted_poll(response, result)
             return self._follow_call_job(poll) if poll else result
@@ -401,15 +428,21 @@ class AsyncHydrafetch(_Base):
                     f"Request to {path} exceeded {self._timeout}s. Raise timeout=, "
                     "or use the crawl and batch job endpoints for long work."
                 ) from exc
+            except httpx.TransportError:
+                if attempt == self._max_retries:
+                    raise
+                await asyncio.sleep(_backoff(attempt))
+                continue
 
             self.last_request_id = response.headers.get("x-request-id") or self.last_request_id
             try:
                 result = _unwrap(response)
             except HydrafetchError as err:
-                if not err.is_retryable or attempt == self._max_retries:
+                wait = _retry_wait(err, attempt)
+                if not err.is_retryable or attempt == self._max_retries or wait is None:
                     raise
                 last = err
-                await asyncio.sleep(_backoff(attempt))
+                await asyncio.sleep(wait)
                 continue
             poll = _accepted_poll(response, result)
             return await self._follow_call_job(poll) if poll else result
