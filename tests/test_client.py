@@ -210,6 +210,24 @@ class TestErrors:
 
         assert make_client(handler, max_retries=2).scrape("https://example.com")["markdown"] == "ok"
 
+    def test_reuses_one_idempotency_key_across_retries(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("hydrafetch._client.time.sleep", lambda _s: None)
+        keys: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            keys.append(request.headers["idempotency-key"])
+            if len(keys) == 1:
+                return ok({"success": False, "error": {"message": "busy"}}, 503)
+            return ok({"success": True, "data": {"markdown": "ok"}})
+
+        client = make_client(handler, max_retries=2)
+        client.scrape("https://example.com")
+        client.scrape("https://example.com")
+        assert keys[0] == keys[1]
+        assert keys[1] != keys[2]
+
 
 class TestJobs:
     def test_reads_batch_id_from_the_top_level_not_from_data(self) -> None:

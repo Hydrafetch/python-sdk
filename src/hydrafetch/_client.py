@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import random
 import time
+import uuid
 from collections.abc import Iterable, Mapping
 from datetime import datetime
 from typing import Any, Callable, Literal, TypeVar
@@ -120,6 +121,10 @@ def _retry_after(response: httpx.Response, details: Any) -> int | None:
     return None
 
 
+def _idempotency_headers(method: str) -> dict[str, str] | None:
+    return {"Idempotency-Key": uuid.uuid4().hex} if method.upper() == "POST" else None
+
+
 def _backoff(attempt: int) -> float:
     return random.uniform(0, min(BACKOFF_CAP, 0.5 * 2**attempt))
 
@@ -226,10 +231,15 @@ class Hydrafetch(_Base):
         params: Mapping[str, Any] | None = None,
     ) -> Any:
         last: HydrafetchError | None = None
+        headers = _idempotency_headers(method)
         for attempt in range(self._max_retries + 1):
             try:
                 response = self._http.request(
-                    method, path, json=json, params=_drop_none(params or {}) or None
+                    method,
+                    path,
+                    json=json,
+                    params=_drop_none(params or {}) or None,
+                    headers=headers,
                 )
             except httpx.TimeoutException as exc:
                 raise HydrafetchTimeout(
@@ -418,10 +428,15 @@ class AsyncHydrafetch(_Base):
         import asyncio
 
         last: HydrafetchError | None = None
+        headers = _idempotency_headers(method)
         for attempt in range(self._max_retries + 1):
             try:
                 response = await self._http.request(
-                    method, path, json=json, params=_drop_none(params or {}) or None
+                    method,
+                    path,
+                    json=json,
+                    params=_drop_none(params or {}) or None,
+                    headers=headers,
                 )
             except httpx.TimeoutException as exc:
                 raise HydrafetchTimeout(

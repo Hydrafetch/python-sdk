@@ -44,7 +44,7 @@ class HydrafetchError(Exception):
 
     @property
     def is_retryable(self) -> bool:
-        return self.status == 429 or self.status >= 500
+        return self.status == 429 or self.status >= 500 or self.code == "IDEMPOTENCY_IN_PROGRESS"
 
 
 class HydrafetchTimeout(HydrafetchError):
