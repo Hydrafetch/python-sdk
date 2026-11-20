@@ -351,6 +351,12 @@ class Hydrafetch(_Base):
     def batch_status(self, batch_id: str) -> dict[str, Any]:
         return self._request("GET", f"/v1/web/batch/{batch_id}")
 
+    def cancel_crawl(self, crawl_id: str) -> dict[str, Any]:
+        return self._request("DELETE", f"/v1/web/crawl/{crawl_id}")
+
+    def cancel_batch(self, batch_id: str) -> dict[str, Any]:
+        return self._request("DELETE", f"/v1/web/batch/{batch_id}")
+
     def crawl(
         self,
         url: str,
@@ -559,3 +565,9 @@ class AsyncHydrafetch(_Base):
 
     async def batch_status(self, batch_id: str) -> dict[str, Any]:
         return await self._request("GET", f"/v1/web/batch/{batch_id}")
+
+    async def cancel_crawl(self, crawl_id: str) -> dict[str, Any]:
+        return await self._request("DELETE", f"/v1/web/crawl/{crawl_id}")
+
+    async def cancel_batch(self, batch_id: str) -> dict[str, Any]:
+        return await self._request("DELETE", f"/v1/web/batch/{batch_id}")

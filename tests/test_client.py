@@ -230,6 +230,16 @@ class TestErrors:
 
 
 class TestJobs:
+    def test_cancels_a_crawl_or_batch_with_a_delete_on_its_id(self) -> None:
+        rec = Recorder({"success": True, "data": {"status": "cancelled"}})
+        client = make_client(rec)
+        results = [client.cancel_crawl("c_1"), client.cancel_batch("b_1")]
+        assert [r["status"] for r in results] == ["cancelled", "cancelled"]
+        assert [(r.method, r.url.path) for r in rec.requests] == [
+            ("DELETE", "/v1/web/crawl/c_1"),
+            ("DELETE", "/v1/web/batch/b_1"),
+        ]
+
     def test_reads_batch_id_from_the_top_level_not_from_data(self) -> None:
         rec = Recorder({"batchId": "b_1", "status": "pending"}, 201)
         assert make_client(rec).start_batch(["https://a.example"]) == "b_1"
