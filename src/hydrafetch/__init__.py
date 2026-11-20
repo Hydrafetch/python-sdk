@@ -4,4 +4,4 @@ from ._client import AsyncHydrafetch, Hydrafetch
 from .errors import HydrafetchError, HydrafetchTimeout
 
 __all__ = ["AsyncHydrafetch", "Hydrafetch", "HydrafetchError", "HydrafetchTimeout"]
-__version__ = "0.9.0"
+__version__ = "0.10.0"
