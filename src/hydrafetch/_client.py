@@ -343,10 +343,13 @@ class Hydrafetch(_Base):
         return self._request("GET", f"/v1/web/crawl/{crawl_id}")
 
     def start_batch(self, urls: Iterable[str], **options: Any) -> str:
+        return self.submit_batch(urls, **options)["batchId"]
+
+    def submit_batch(self, urls: Iterable[str], **options: Any) -> dict[str, Any]:
         payload = self._request(
             "POST", "/v1/web/batch", json={"urls": list(urls), **_drop_none(options)}
         )
-        return self._job_id(payload, "batchId")
+        return {**payload, "batchId": self._job_id(payload, "batchId")}
 
     def batch_status(self, batch_id: str) -> dict[str, Any]:
         return self._request("GET", f"/v1/web/batch/{batch_id}")
@@ -558,10 +561,13 @@ class AsyncHydrafetch(_Base):
         return await self._request("GET", f"/v1/web/crawl/{crawl_id}")
 
     async def start_batch(self, urls: Iterable[str], **options: Any) -> str:
+        return (await self.submit_batch(urls, **options))["batchId"]
+
+    async def submit_batch(self, urls: Iterable[str], **options: Any) -> dict[str, Any]:
         payload = await self._request(
             "POST", "/v1/web/batch", json={"urls": list(urls), **_drop_none(options)}
         )
-        return self._job_id(payload, "batchId")
+        return {**payload, "batchId": self._job_id(payload, "batchId")}
 
     async def batch_status(self, batch_id: str) -> dict[str, Any]:
         return await self._request("GET", f"/v1/web/batch/{batch_id}")

@@ -230,6 +230,11 @@ class TestErrors:
 
 
 class TestJobs:
+    def test_submit_batch_says_which_urls_were_skipped(self) -> None:
+        rec = Recorder({"batchId": "b_1", "status": "queued", "invalidUrls": ["htps//a"]}, 201)
+        accepted = make_client(rec).submit_batch(["https://a.example", "htps//a"])
+        assert (accepted["batchId"], accepted["invalidUrls"]) == ("b_1", ["htps//a"])
+
     def test_cancels_a_crawl_or_batch_with_a_delete_on_its_id(self) -> None:
         rec = Recorder({"success": True, "data": {"status": "cancelled"}})
         client = make_client(rec)
