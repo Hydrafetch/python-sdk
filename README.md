@@ -178,6 +178,40 @@ for job in acme["opened"]:
 
 A search costs 1 credit per 10 jobs returned, and an empty one is free. Hiring changes cost 1 credit per company we have jobs for; companies we do not track yet come back empty and are free.
 
+## Monitors
+
+Watch pages, a whole site or a search on a schedule and hear about what changed. Monitors are available on paid plans.
+
+```python
+monitor = hf.create_monitor(
+    "Competitors",
+    [
+        {"type": "pages", "urls": ["https://acme.com/pricing"], "goal": "a plan gets cheaper"},
+        {"type": "site", "url": "https://acme.com/blog"},
+        {"type": "search", "query": "acme funding"},
+    ],
+    every="1h",
+    webhook={"url": "https://your-app.com/hooks/hydrafetch"},
+)
+```
+
+A pages target reports text that changed, as a line diff, plus fields such as price and availability. A site target reports pages that appear or go away, with each new page's title and opening lines. A search target reports results it has never returned before. With a `goal`, a change only alerts when it matches, and every change keeps the verdict and a one-sentence reason.
+
+Checks run in the background. Your webhook receives `monitor.change` for each change and `monitor.check.completed` once a check ends, or read them yourself:
+
+```python
+latest = hf.list_monitor_checks(monitor["id"], limit=1)[0]
+for change in hf.get_monitor_check(monitor["id"], latest["id"])["changes"]:
+    print(change["status"], change["url"], (change.get("judge") or {}).get("reason") or change["diff"])
+
+hf.run_monitor(monitor["id"])  # check now, outside the schedule
+hf.update_monitor(monitor["id"], status="paused")
+```
+
+`update_monitor` takes `every=` for the schedule and any other field as it is named in the API. The async client has the same methods.
+
+A page read costs 1 credit, a site costs 1 per check plus 1 per new page read, and a search costs 1 per check. A goal adds 1 credit per change it checks. Pages that cannot be read are not charged.
+
 ## Brand data
 
 ```python
@@ -299,6 +333,11 @@ hf = Hydrafetch(
 | `start_crawl`, `start_batch` | job id `str` | 1 per page |
 | `crawl_status(id)`, `batch_status(id)` | job dict | free |
 | `cancel_crawl(id)`, `cancel_batch(id)` | job dict | free, pages not yet read are not charged |
+| `create_monitor(name, targets, every=, **options)`, `update_monitor(id, **changes)` | monitor dict | free; checks are charged as they run |
+| `list_monitors(limit=, offset=)`, `get_monitor(id)` | list, monitor dict | free |
+| `run_monitor(id)` | check summary dict | as a scheduled check |
+| `list_monitor_checks(id, limit=, offset=)`, `get_monitor_check(id, check_id)` | list, check dict | free |
+| `delete_monitor(id)` | `None` | free |
 | `submit_batch(urls, **options)` | dict with `batchId`, `status` and `invalidUrls` | 1 per page |
 | `rate_result(rating, request_id=, url=, reasons=, note=)` | rating dict | free |
 

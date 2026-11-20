@@ -80,6 +80,14 @@ def _unwrap(response: httpx.Response) -> Any:
     return payload
 
 
+def _monitor_changes(changes: Mapping[str, Any]) -> dict[str, Any]:
+    body = _drop_none(dict(changes))
+    every = body.pop("every", None)
+    if every is not None:
+        body["schedule"] = {"every": every}
+    return body
+
+
 def _accepted_poll(response: httpx.Response, result: Any) -> str | None:
     if response.status_code == ACCEPTED and isinstance(result, dict) and result.get("poll"):
         return str(result["poll"])
@@ -360,6 +368,41 @@ class Hydrafetch(_Base):
     def cancel_batch(self, batch_id: str) -> dict[str, Any]:
         return self._request("DELETE", f"/v1/web/batch/{batch_id}")
 
+    def create_monitor(
+        self, name: str, targets: Iterable[Mapping[str, Any]], *, every: str, **options: Any
+    ) -> dict[str, Any]:
+        body = {"name": name, "schedule": {"every": every}, "targets": list(targets)}
+        return self._request("POST", "/v1/web/monitors", json={**body, **_drop_none(options)})
+
+    def list_monitors(self, *, limit: int | None = None, offset: int | None = None) -> list[Any]:
+        return self._request("GET", "/v1/web/monitors", params={"limit": limit, "offset": offset})
+
+    def get_monitor(self, monitor_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/v1/web/monitors/{monitor_id}")
+
+    def update_monitor(self, monitor_id: str, **changes: Any) -> dict[str, Any]:
+        return self._request(
+            "PATCH", f"/v1/web/monitors/{monitor_id}", json=_monitor_changes(changes)
+        )
+
+    def delete_monitor(self, monitor_id: str) -> None:
+        self._request("DELETE", f"/v1/web/monitors/{monitor_id}")
+
+    def run_monitor(self, monitor_id: str) -> dict[str, Any]:
+        return self._request("POST", f"/v1/web/monitors/{monitor_id}/run")
+
+    def list_monitor_checks(
+        self, monitor_id: str, *, limit: int | None = None, offset: int | None = None
+    ) -> list[Any]:
+        return self._request(
+            "GET",
+            f"/v1/web/monitors/{monitor_id}/checks",
+            params={"limit": limit, "offset": offset},
+        )
+
+    def get_monitor_check(self, monitor_id: str, check_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/v1/web/monitors/{monitor_id}/checks/{check_id}")
+
     def crawl(
         self,
         url: str,
@@ -577,3 +620,42 @@ class AsyncHydrafetch(_Base):
 
     async def cancel_batch(self, batch_id: str) -> dict[str, Any]:
         return await self._request("DELETE", f"/v1/web/batch/{batch_id}")
+
+    async def create_monitor(
+        self, name: str, targets: Iterable[Mapping[str, Any]], *, every: str, **options: Any
+    ) -> dict[str, Any]:
+        body = {"name": name, "schedule": {"every": every}, "targets": list(targets)}
+        return await self._request("POST", "/v1/web/monitors", json={**body, **_drop_none(options)})
+
+    async def list_monitors(
+        self, *, limit: int | None = None, offset: int | None = None
+    ) -> list[Any]:
+        return await self._request(
+            "GET", "/v1/web/monitors", params={"limit": limit, "offset": offset}
+        )
+
+    async def get_monitor(self, monitor_id: str) -> dict[str, Any]:
+        return await self._request("GET", f"/v1/web/monitors/{monitor_id}")
+
+    async def update_monitor(self, monitor_id: str, **changes: Any) -> dict[str, Any]:
+        return await self._request(
+            "PATCH", f"/v1/web/monitors/{monitor_id}", json=_monitor_changes(changes)
+        )
+
+    async def delete_monitor(self, monitor_id: str) -> None:
+        await self._request("DELETE", f"/v1/web/monitors/{monitor_id}")
+
+    async def run_monitor(self, monitor_id: str) -> dict[str, Any]:
+        return await self._request("POST", f"/v1/web/monitors/{monitor_id}/run")
+
+    async def list_monitor_checks(
+        self, monitor_id: str, *, limit: int | None = None, offset: int | None = None
+    ) -> list[Any]:
+        return await self._request(
+            "GET",
+            f"/v1/web/monitors/{monitor_id}/checks",
+            params={"limit": limit, "offset": offset},
+        )
+
+    async def get_monitor_check(self, monitor_id: str, check_id: str) -> dict[str, Any]:
+        return await self._request("GET", f"/v1/web/monitors/{monitor_id}/checks/{check_id}")

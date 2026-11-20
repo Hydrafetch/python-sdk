@@ -467,3 +467,70 @@ async def test_the_async_client_follows_a_202_too(monkeypatch) -> None:
         base_url="https://api.hydrafetch.com", transport=httpx.MockTransport(handler)
     )
     assert await client.map("https://example.com") == {"count": 3}
+
+
+class TestMonitors:
+    def test_creates_a_monitor_with_its_schedule_targets_and_goal(self) -> None:
+        rec = Recorder({"success": True, "data": {"id": "mon_1"}}, 201)
+        out = make_client(rec).create_monitor(
+            "Pricing",
+            [{"type": "pages", "urls": ["https://acme.com/pricing"], "goal": "the price drops"}],
+            every="1h",
+            email="daily",
+        )
+        assert out == {"id": "mon_1"}
+        assert (rec.last.method, rec.last.url.path) == ("POST", "/v1/web/monitors")
+        assert rec.json_body() == {
+            "name": "Pricing",
+            "schedule": {"every": "1h"},
+            "targets": [
+                {"type": "pages", "urls": ["https://acme.com/pricing"], "goal": "the price drops"}
+            ],
+            "email": "daily",
+        }
+
+    def test_update_nests_every_under_schedule_and_leaves_the_rest(self) -> None:
+        rec = Recorder({"success": True, "data": {"id": "mon_1"}})
+        make_client(rec).update_monitor("mon_1", every="1d", status="paused")
+        assert (rec.last.method, rec.last.url.path) == ("PATCH", "/v1/web/monitors/mon_1")
+        assert rec.json_body() == {"schedule": {"every": "1d"}, "status": "paused"}
+
+    def test_reaches_each_monitor_route(self) -> None:
+        rec = Recorder({"success": True, "data": []})
+        client = make_client(rec)
+        client.list_monitors(limit=10, offset=20)
+        client.get_monitor("mon_1")
+        client.run_monitor("mon_1")
+        client.list_monitor_checks("mon_1", limit=5)
+        client.get_monitor_check("mon_1", "chk_1")
+        assert [
+            (r.method, str(r.url).removeprefix("https://api.hydrafetch.com")) for r in rec.requests
+        ] == [
+            ("GET", "/v1/web/monitors?limit=10&offset=20"),
+            ("GET", "/v1/web/monitors/mon_1"),
+            ("POST", "/v1/web/monitors/mon_1/run"),
+            ("GET", "/v1/web/monitors/mon_1/checks?limit=5"),
+            ("GET", "/v1/web/monitors/mon_1/checks/chk_1"),
+        ]
+
+    def test_delete_returns_nothing_on_an_empty_204(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(204)
+
+        assert make_client(handler).delete_monitor("mon_1") is None
+
+    async def test_the_async_client_has_the_same_monitor_methods(self) -> None:
+        rec = Recorder({"success": True, "data": {"id": "mon_1"}})
+        client = AsyncHydrafetch(api_key="hf_test", max_retries=0)
+        client._http = httpx.AsyncClient(
+            base_url="https://api.hydrafetch.com",
+            headers=client._http.headers,
+            transport=httpx.MockTransport(rec),
+        )
+        async with client:
+            await client.update_monitor("mon_1", every="1h")
+            await client.delete_monitor("mon_1")
+        assert [(r.method, r.url.path) for r in rec.requests] == [
+            ("PATCH", "/v1/web/monitors/mon_1"),
+            ("DELETE", "/v1/web/monitors/mon_1"),
+        ]
